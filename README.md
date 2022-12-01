@@ -1,4 +1,4 @@
-# EdgeVision
+# Edge Vision
 
 ## How to run the program:
 Run the following command in your terminal:
