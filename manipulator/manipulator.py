@@ -1,14 +1,10 @@
+import os
 import socket
 import pickle
 from pydantic import BaseModel
 
 from datetime import datetime
 from enum import Enum
-
-
-class SensorData(BaseModel):
-    datetime: str
-    payload: int
 
 
 class Status(Enum):
@@ -32,14 +28,17 @@ class ControllerSignal(BaseModel):
     status: Status
 
 
-HEADER_SIZE = 10
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # declare a socket for the client-server
 
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.bind(('localhost', 1236))
-s.listen(5)
+PORT = int(os.environ.get("PORT"))  # get the port of the manipulator
+s.bind(('0.0.0.0', PORT))  # bind the socket to the port
+s.listen()  # listen for connections
+
+print("Listening for connections...")
 
 while True:
     client_socket, address = s.accept()
+    # TODO: logging instead of print
     print(f"Connection from {address} has been established.")
 
     while True:
@@ -50,4 +49,6 @@ while True:
             continue
 
         signal = pickle.loads(msg)
-        print(ControllerSignal.parse_raw(signal))
+
+        # TODO: logging instead of print
+        print(ControllerSignal.parse_raw(signal).json())

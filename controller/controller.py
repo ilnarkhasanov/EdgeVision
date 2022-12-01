@@ -1,7 +1,9 @@
+import os
 import pickle
 import socket
 from typing import List
 from enum import Enum
+from datetime import datetime
 
 from fastapi import FastAPI
 import asyncio
@@ -25,11 +27,11 @@ class SensorSignal(BaseModel):
         datetime: the datetime when the signal was sent
         payload: the payload of the signal
     """
-    datetime: str
+    date_time: datetime
     payload: int
 
 
-class ControllerSignals(BaseModel):
+class ControllerSignal(BaseModel):
     """
     This pydantic model represents the signals from the controller.
 
@@ -37,7 +39,7 @@ class ControllerSignals(BaseModel):
         datetime: the datetime when the signal was sent
         status: the status of the manipulator
     """
-    datetime: str
+    date_time: datetime
     status: Status
 
 
@@ -45,7 +47,28 @@ app = FastAPI()  # a FastAPI app instance
 sensor_signals = []  # this list will contain the signals from the sensors
 
 client_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # declare a socket for the client-server
-client_server.connect(('localhost', 1235))  # connect to the manipulator server
+
+MANIPULATOR_HOST = os.environ.get("MANIPULATOR_HOST")  # get the host of the manipulator
+MANIPULATOR_PORT = int(os.environ.get("MANIPULATOR_PORT"))  # get the port of the manipulator
+client_server.connect((MANIPULATOR_HOST, MANIPULATOR_PORT))  # connect to the manipulator server
+
+
+async def decision(signals_from_sensors: List[SensorSignal]) -> ControllerSignal:
+    """
+    This function makes a decision based on the signals from the sensors.
+
+    Idea:
+    If the sum of the payloads is even number, then the status should be UP.
+    Otherwise, the status should be DOWN.
+
+    param sensor_signals: list of signals from the sensors
+    :return: the controller signal that will be sent to the manipulator server
+    """
+    total_payload = sum(signal.payload for signal in signals_from_sensors)  # sum the payloads of the signals
+    if total_payload % 2 == 0:
+        return ControllerSignal(date_time=datetime.now(), status=Status.UP)
+    else:
+        return ControllerSignal(date_time=datetime.now(), status=Status.DOWN)
 
 
 async def send_data() -> None:
@@ -57,8 +80,12 @@ async def send_data() -> None:
 
     while True:
         await asyncio.sleep(5)  # wait for 5 seconds, but don't block the event loop
-        sensor_signals_b = pickle.dumps(sensor_signals)  # serialize signals
+
+        decision_signal = await decision(sensor_signals)  # get the decision signal
+        sensor_signals_b = pickle.dumps(decision_signal.json())  # serialize signals
+
         client_server.send(sensor_signals_b)  # send serialized signals to the manipulator server
+
         sensor_signals = []  # clear the list
 
 
@@ -69,10 +96,15 @@ async def receive_sensor_signal(signal: SensorSignal) -> SensorSignal:
     param signal: signal from the sensors
     :return: sent signal
     """
-    sensor_signals.append(signal.json())
+    sensor_signals.append(signal)  # add the signal to the signals list
+    print(signal.json())  # print the signal
     return signal
 
 
 @app.on_event("startup")
 async def startup_event() -> None:
+    """
+    This function is called when the app starts.
+    :return: None
+    """
     asyncio.create_task(send_data())
