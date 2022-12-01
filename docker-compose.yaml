@@ -16,6 +16,8 @@ services:
     build: controller
     container_name: controller
     hostname: ${CONTROLLER_HOST}
+    volumes:
+      - ./controller/logs:/app/logs
     expose:
       - ${MANIPULATOR_PORT}
     environment:

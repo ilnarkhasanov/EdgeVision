@@ -1,6 +1,7 @@
 import os
 import pickle
 import socket
+import logging
 from typing import List
 from enum import Enum
 from datetime import datetime
@@ -43,6 +44,7 @@ class ControllerSignal(BaseModel):
     status: Status
 
 
+logging.basicConfig(filename='logs/controller.log', level=logging.INFO)
 app = FastAPI()  # a FastAPI app instance
 sensor_signals = []  # this list will contain the signals from the sensors
 
@@ -83,6 +85,7 @@ async def send_data() -> None:
 
         decision_signal = await decision(sensor_signals)  # get the decision signal
         sensor_signals_b = pickle.dumps(decision_signal.json())  # serialize signals
+        logging.info(decision_signal.json())  # log the signal
 
         client_server.send(sensor_signals_b)  # send serialized signals to the manipulator server
 
